@@ -24,8 +24,13 @@ Ext.define("TSFieldEditorsByPI", {
     _addSelectors: function() {
         var container = this.down('#selector_box');
         container.removeAll();
+
+        var type_container = container.add({
+            xtype:'container',
+            layout: 'vbox'
+        });
         
-        container.add({ 
+        type_container.add({ 
             xtype: 'rallyportfolioitemtypecombobox',
             
             fieldLabel: 'Type:',
@@ -51,7 +56,8 @@ Ext.define("TSFieldEditorsByPI", {
 //            }
 //        });
         
-        container.add({ 
+        
+        type_container.add({ 
             xtype: 'rallyfieldcombobox',
             model: 'PortfolioItem',
             fieldLabel: 'Field:',
@@ -74,6 +80,38 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
         
+        var date_container = container.add({
+            xtype:'container',
+            layout: 'vbox'
+        });
+        
+        date_container.add({
+            xtype: 'rallydatefield',
+            itemId:'startDateSelector',
+            fieldLabel:'From:',
+            labelWidth:45,
+            listeners: {
+                scope: this,
+                change: function(cb){
+                    this.startDate = cb.getValue();
+                }
+            }
+        });
+        
+        date_container.add({
+            xtype: 'rallydatefield',
+            itemId:'endDateSelector',
+            fieldLabel:'To:',
+            labelWidth:45,
+            listeners: {
+                scope: this,
+                change: function(cb){
+                    this.endDate = cb.getValue();
+                }
+            }
+        });
+        
+         
         container.add({
             xtype: 'rallyusersearchcombobox',
             fieldLabel:'Allowed Users:',
@@ -120,7 +158,9 @@ Ext.define("TSFieldEditorsByPI", {
             PIs = this.PIs || [],
             type = this.piType || null,
             field = this.field,
-            users = this.users || [];
+            users = this.users || [],
+            end_date = this.endDate,
+            start_date = this.startDate;
         
         this.setLoading('Loading Revisions');
         
@@ -154,6 +194,21 @@ Ext.define("TSFieldEditorsByPI", {
                 
                 var filters = name_filters.and(history_filters);
                           
+                if ( end_date ) {
+                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                        property: 'CreationDate', 
+                        operator: '<=', 
+                        value: Rally.util.DateTime.toIsoString(end_date)
+                    }));
+                }
+                
+                if ( start_date ) {
+                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                        property: 'CreationDate', 
+                        operator: '>=', 
+                        value: Rally.util.DateTime.toIsoString(start_date)
+                    }));
+                }
                 
                 var config = {
                     model:'Revision',
