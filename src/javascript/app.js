@@ -26,16 +26,30 @@ Ext.define("TSFieldEditorsByPI", {
         container.removeAll();
         
         container.add({ 
-            xtype:'portfolioitempickerbutton',
-            layout: 'hbox',
+            xtype: 'rallyportfolioitemtypecombobox',
+            
+            fieldLabel: 'Type:',
+            labelWidth: 55,
             listeners: {
                 scope: this,
-                itemschosen: function(picker,items) {
-                    this.PIs = items;
+                change: function(cb) {
+                    this.piType = cb.getRecord();
                     this._enableGoButton();
                 }
             }
         });
+        
+//        container.add({ 
+//            xtype:'portfolioitempickerbutton',
+//            layout: 'hbox',
+//            listeners: {
+//                scope: this,
+//                itemschosen: function(picker,items) {
+//                    this.PIs = items;
+//                    this._enableGoButton();
+//                }
+//            }
+//        });
         
         container.add({ 
             xtype: 'rallyfieldcombobox',
@@ -91,9 +105,12 @@ Ext.define("TSFieldEditorsByPI", {
         if ( !button ) { return; }
         button.setDisabled(true);
         
-        if ( !this.PIs || this.PIs.length === 0 ) { return; }
+        
+        if ( !this.piType && ( !this.PIs || this.PIs.length === 0 ) ) { return; }
         
         if ( Ext.isEmpty(this.field) ) { return; }
+        
+        this.logger.log('PIs', this.PIs, ' Type:', this.piType);
         
         button.setDisabled(false);
     },
@@ -101,52 +118,78 @@ Ext.define("TSFieldEditorsByPI", {
     _updateData: function() {
         var me = this,
             PIs = this.PIs || [],
+            type = this.piType || null,
             field = this.field,
             users = this.users || [];
         
-        this.logger.log("Review history for ", this.PIs[0].get('FormattedID'), this.PIs);
         this.setLoading('Loading Revisions');
         
-        var revision_history = this.PIs[0].get('RevisionHistory');
-        if ( Ext.isEmpty(revision_history) ) {
-            throw "Cannot proceed without revision history";
-        }
+//        var revision_history = this.PIs[0].get('RevisionHistory');
+//        if ( Ext.isEmpty(revision_history) ) {
+//            throw "Cannot proceed without revision history";
+//        }
         
-        var filters = Rally.data.wsapi.Filter.and([{property:'RevisionHistory.ObjectID',value:revision_history.ObjectID}]);
-        
-        var field_display_name = field.get('name');
-        var field_internal_name = field.get('value');
-        
-        var name_filters =  Rally.data.wsapi.Filter.or([
-            {property:'Description',operator:'contains',value:field_display_name},
-            {property:'Description',operator:'contains',value:field_internal_name}
-        ]);
-        
-        filters = filters.and(name_filters);
-        
-        var config = {
-            model:'Revision',
-            filters: filters,
-            fetch: true,
-            limit: 2000,
-            pageSize: 2000,
-            sorters: [{property:'CreationDate',direction:'DESC'}]
-        };
-        
-        this._loadWsapiRecords(config).then({
+        this._getPIs(type).then({
             scope: this,
-            success: function(revisions){
-                this.logger.log('revisions:', revisions);
+            success: function(pis) {
+                var history_filters = Rally.data.wsapi.Filter.or(
+                    Ext.Array.map(pis, function(pi){
+                        var revision_history = pi.get('RevisionHistory');
+                        return {property:'RevisionHistory.ObjectID',value:revision_history.ObjectID};
+                    })
+                );
+                                
+                var field_display_name = field.get('name');
+                var field_internal_name = field.get('value');
                 
-                var records = Ext.Array.filter(revisions, function(revision){
-                    return !Ext.Array.contains(users, revision.get('User')._ref);
-                });                
-                me._displayGrid(records);
+                var name_filters =  Rally.data.wsapi.Filter.or([
+                    {property:'Description',operator:'contains',value:field_display_name},
+                    {property:'Description',operator:'contains',value:field_internal_name}
+                ]);
+                
+                var filters = name_filters.and(history_filters);
+                                
+                var config = {
+                    model:'Revision',
+                    filters: filters,
+                    fetch: true,
+                    limit: Infinity,
+                    pageSize: 2000,
+                    enablePostGet: true,
+                    sorters: [{property:'CreationDate',direction:'DESC'}]
+                };
+                
+                this._loadWsapiRecords(config).then({
+                    scope: this,
+                    success: function(revisions){
+                        this.logger.log('revisions:', revisions);
+                        
+                        var records = Ext.Array.filter(revisions, function(revision){
+                            return !Ext.Array.contains(users, revision.get('User')._ref);
+                        });                
+                        me._displayGrid(records);
+                    },
+                    failure: function(msg) {
+                        Ext.Msg.alert('Problem Loading Revisions', msg);
+                    }
+                }).always(function() { me.setLoading(false); });
             },
             failure: function(msg) {
-                Ext.Msg.alert('Problem Loading Revisions', msg);
+                Ext.Msg.alert('Problem loading ' + type.get('ElementName'), msg);
             }
-        }).always(function() { me.setLoading(false); });
+           
+        });
+        
+    },
+    
+    _getPIs: function(type) {
+        var config = {
+            limit: Infinity,
+            pageSize: 2000,
+            model: type.get('TypePath'),
+            fetch: ['FormattedID','RevisionHistory','Project','ObjectID']
+        };
+        return this._loadWsapiRecords(config);
     },
     
     _loadWsapiRecords: function(config){
