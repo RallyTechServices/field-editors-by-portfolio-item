@@ -132,10 +132,15 @@ Ext.define("TSFieldEditorsByPI", {
         this._getPIs(type).then({
             scope: this,
             success: function(pis) {
+                var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
                 var history_filters = Rally.data.wsapi.Filter.or(
                     Ext.Array.map(pis, function(pi){
                         var revision_history = pi.get('RevisionHistory');
-                        return {property:'RevisionHistory.ObjectID',value:revision_history.ObjectID};
+                        var oid = revision_history.ObjectID;
+                        // keep pi around so we can refer to it later
+                        pis_by_rev_history_oid[oid] = pi;
+                        
+                        return {property:'RevisionHistory.ObjectID',value:oid};
                     })
                 );
                                 
@@ -148,11 +153,12 @@ Ext.define("TSFieldEditorsByPI", {
                 ]);
                 
                 var filters = name_filters.and(history_filters);
-                                
+                          
+                
                 var config = {
                     model:'Revision',
                     filters: filters,
-                    fetch: true,
+                    fetch: ['ObjectID','RevisionHistory','CreationDate','User','RevisionNumber','Description'],
                     limit: Infinity,
                     pageSize: 2000,
                     enablePostGet: true,
@@ -164,10 +170,20 @@ Ext.define("TSFieldEditorsByPI", {
                     success: function(revisions){
                         this.logger.log('revisions:', revisions);
                         
-                        var records = Ext.Array.filter(revisions, function(revision){
+                        var filtered_records = Ext.Array.filter(revisions, function(revision){
                             return !Ext.Array.contains(users, revision.get('User')._ref);
-                        });                
-                        me._displayGrid(records);
+                        });
+                        
+                        var data = Ext.Array.map(filtered_records, function(record){
+                            var item = record.getData();
+                            var rev_history_oid = item.RevisionHistory.ObjectID;
+                            item.__pi = pis_by_rev_history_oid[rev_history_oid];
+                            item.__pi_oid = item.__pi.get('ObjectID');
+                            item.__pi_fid = item.__pi.get('FormattedID');
+                            item.__pi_name = item.__pi.get('Name');
+                            return item;
+                        });
+                        me._displayGrid(data);
                     },
                     failure: function(msg) {
                         Ext.Msg.alert('Problem Loading Revisions', msg);
@@ -187,7 +203,7 @@ Ext.define("TSFieldEditorsByPI", {
             limit: Infinity,
             pageSize: 2000,
             model: type.get('TypePath'),
-            fetch: ['FormattedID','RevisionHistory','Project','ObjectID']
+            fetch: ['FormattedID','RevisionHistory','Project','Name','ObjectID']
         };
         return this._loadWsapiRecords(config);
     },
@@ -228,6 +244,11 @@ Ext.define("TSFieldEditorsByPI", {
     
     _getColumns: function() {
         return [
+            { dataIndex: '__pi_oid', text: 'ID', renderer: function(value,meta,record){
+               if ( Ext.isEmpty(value) ) { return ""; }
+               return record.get('__pi_fid');
+            }},
+            { dataIndex: '__pi_name', text: 'Name' },
             { dataIndex: 'CreationDate', text: 'Date' },
             { dataIndex: 'User', text: 'User', renderer: function(value,meta,record){
                 if ( Ext.isEmpty(value) ) { return "None"; }
