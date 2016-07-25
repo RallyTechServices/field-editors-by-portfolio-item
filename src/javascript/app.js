@@ -16,9 +16,16 @@ Ext.define("TSFieldEditorsByPI", {
     integrationHeaders : {
         name : "TSFieldEditorsByPI"
     },
+    
+    config: {
+        defaultSettings: {
+            timeboxType: 'Dates'
+        }
+    },
 
     launch: function() {
         var me = this;
+        this.timeboxType = this.getSetting('timeboxType');
         this._addSelectors();
     },
     
@@ -81,6 +88,41 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
         
+        this.logger.log('timebox type:', this.timeboxType);
+        if ( this.timeboxType == "Dates" ) {
+            this._addDateSelectors(container); 
+        }
+        
+        if ( this.timeboxType == "Release" ) {
+            this._addReleaseSelector(container);
+        }
+        
+        container.add({
+            xtype: 'tsmultiuserpicker',
+            fieldLabel: 'Allowed Users:',
+            listeners: {
+                change: function(picker, users) {
+                    this.users = Ext.Array.map(users, function(user){ return user._ref; });
+                    //this._updateData();
+                    
+                },
+                scope: this
+            }
+        });
+
+        container.add({
+            xtype:'rallybutton',
+            itemId:'go_button',
+            disabled: true,
+            text:'Go',
+            listeners: {
+                scope: this,
+                click: this._updateData
+            }
+        });
+    },
+    
+    _addDateSelectors: function(container) {
         var date_container = container.add({
             xtype:'container',
             layout: 'vbox'
@@ -111,32 +153,24 @@ Ext.define("TSFieldEditorsByPI", {
                 }
             }
         });
+    },
+    
+    _addReleaseSelector: function(container) {
         
-         
         container.add({
-            xtype: 'tsmultiuserpicker',
-            fieldLabel: 'Allowed Users:',
-            listeners: {
-                change: function(picker, users) {
-                    this.users = Ext.Array.map(users, function(user){ return user._ref; });
-                    //this._updateData();
-                    
-                },
-                scope: this
-            }
-        });
-
-        container.add({
-            xtype:'rallybutton',
-            itemId:'go_button',
-            disabled: true,
-            text:'Go',
+            xtype: 'rallyreleasecombobox',
+            itemId:'releaseSelector',
+            fieldLabel:'Release:',
+            labelWidth:45,
             listeners: {
                 scope: this,
-                click: this._updateData
+                change: function(cb){
+                    this.release = cb.getRecord();
+                }
             }
         });
     },
+    
     
     _enableGoButton: function() {
         var button = this.down('#go_button');
@@ -160,7 +194,8 @@ Ext.define("TSFieldEditorsByPI", {
             field = this.field,
             users = this.users || [],
             end_date = this.endDate,
-            start_date = this.startDate;
+            start_date = this.startDate,
+            release = this.release;
         
         this.setLoading('Loading Revisions');
         
@@ -254,13 +289,28 @@ Ext.define("TSFieldEditorsByPI", {
     },
     
     _getPIs: function(type) {
+        var filters = [{property:'ObjectID',operator:'>',value:-1}];
+        
+        if ( this._isTypeWithRelease(type) && this.release ){
+            filters = [{property:'Release.Name',value:this.release.get('Name')}];
+        }
+
+        
         var config = {
             limit: Infinity,
             pageSize: 2000,
             model: type.get('TypePath'),
+            filters: filters,
             fetch: ['FormattedID','RevisionHistory','Project','Name','ObjectID']
         };
         return this._loadWsapiRecords(config);
+    },
+    
+    _isTypeWithRelease: function(type){
+        console.log('type:', type);
+        
+        
+        return type.get('Ordinal') == 0 ;
     },
     
     _loadWsapiRecords: function(config){
@@ -324,13 +374,18 @@ Ext.define("TSFieldEditorsByPI", {
         ];
     },
     
-    _launchInfo: function() {
-        if ( this.about_dialog ) { this.about_dialog.destroy(); }
-        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
-    },
-    
-    isExternal: function(){
-        return typeof(this.getAppId()) == 'undefined';
+    getSettingsFields: function() {
+        return [{
+            name           : 'timeboxType',
+            xtype          : 'rallycombobox',
+            id             : 'timeboxType',
+            store          : ['Dates', 'Release'],
+            fieldLabel     : 'Type of Timebox',
+            labelWidth     : 105,
+            labelAlign     : 'right',
+            width          : 247,
+            readyEvent     : 'ready'
+        }];
     }
     
 });
