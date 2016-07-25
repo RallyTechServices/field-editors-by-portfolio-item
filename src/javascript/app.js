@@ -1,3 +1,4 @@
+
 Ext.define("TSFieldEditorsByPI", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -61,19 +62,18 @@ Ext.define("TSFieldEditorsByPI", {
         });
         
         container.add({
-            xtype: 'rallyusersearchcombobox',
-            fieldLabel:'Allowed Users:',
-            project: this.getContext().getProjectRef(),
-            allowNoEntry: false,
-            multiSelect: true,
+            xtype: 'tsmultiuserpicker',
+            fieldLabel: 'Allowed Users:',
             listeners: {
-                scope: this,
-                change: function(cb){
-                    this.users = cb.getValue();
-                }
+                change: function(picker, users) {
+                    this.users = users;
+                    this._updateData();
+                    
+                },
+                scope: this
             }
         });
-        
+
         container.add({
             xtype:'rallybutton',
             itemId:'go_button',
