@@ -206,9 +206,7 @@ Ext.define("TSFieldEditorsByPI", {
         
         this._getPIs(type).then({
             scope: this,
-            success: function(pis) {
-                console.log('--', pis.length);
-                
+            success: function(pis) {                
                 var filters =  [{property:'ObjectID',value:-1}];
                 
                 if ( pis.length > 0 ) {
@@ -312,8 +310,6 @@ Ext.define("TSFieldEditorsByPI", {
     },
     
     _isTypeWithRelease: function(type){
-        console.log('type:', type);
-        
         return type.get('Ordinal') < 1 ;
     },
     

@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 24 2016 18:43:44 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jul 24 2016 18:51:32 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 24 2016 18:43:44 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sun Jul 24 2016 18:51:32 GMT-0700 (PDT)";
         var STORY    = "US353";
         var BUILDER  = "jmartin";
-        var CHECKSUM = 35048118878;
+        var CHECKSUM = 34916006492;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1212,9 +1212,7 @@ Ext.define("TSFieldEditorsByPI", {
         
         this._getPIs(type).then({
             scope: this,
-            success: function(pis) {
-                console.log('--', pis.length);
-                
+            success: function(pis) {                
                 var filters =  [{property:'ObjectID',value:-1}];
                 
                 if ( pis.length > 0 ) {
@@ -1318,8 +1316,6 @@ Ext.define("TSFieldEditorsByPI", {
     },
     
     _isTypeWithRelease: function(type){
-        console.log('type:', type);
-        
         return type.get('Ordinal') < 1 ;
     },
     
