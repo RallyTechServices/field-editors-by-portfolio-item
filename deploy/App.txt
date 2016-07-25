@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 24 2016 18:14:20 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jul 24 2016 18:43:44 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 24 2016 18:14:20 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Sun Jul 24 2016 18:43:44 GMT-0700 (PDT)";
         var STORY    = "US353";
         var BUILDER  = "jmartin";
-        var CHECKSUM = 30220539329;
+        var CHECKSUM = 35048118878;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -505,6 +505,86 @@ Ext.define('Rally.technicalservices.Logger',{
         }
     });
 }());
+
+Ext.define('CA.techservices.ModelTypeCombo', {
+    alias: 'widget.tsmodeltypecombo',
+    extend: 'Rally.ui.combobox.ComboBox',
+//    plugins: [{
+//        ptype: 'rallypreferenceenabledcombobox',
+//        preferenceName: 'piTypeCombo'
+//    }],
+
+    constructor: function(config) {
+        
+        var filters = [
+            {property:'TypePath',operator:'contains',value:'PortfolioItem/'},
+            {property:'TypePath',value:'HierarchicalRequirement'},
+            {property:'TypePath',value:'Defect'}
+        ];
+        
+        
+        var defaultConfig = {
+            defaultSelectionPosition: 'last',
+            editable: false,
+            fieldLabel: 'Type:', // delete this when removing PORTFOLIO_ITEM_TREE_GRID_PAGE_OPT_IN toggle. Only used on old Ext2 page.
+            labelWidth: 30,      // delete this when removing PORTFOLIO_ITEM_TREE_GRID_PAGE_OPT_IN toggle. Only used on old Ext2 page.
+            context: Rally.environment.getContext(),
+            displayField: 'DisplayName',
+            storeConfig: {
+                autoLoad: true,
+                remoteFilter: true,
+                model: Ext.identityFn('TypeDefinition'),
+                sorters: {
+                    property: 'Ordinal',
+                    direction: 'Desc'
+                },
+                filters: Rally.data.wsapi.Filter.or(filters)
+//                filters: [
+//                    {
+//                        property: 'Parent.Name',
+//                        operator: '=',
+//                        value: 'Portfolio Item'
+//                    },
+//                    {
+//                        property: 'Creatable',
+//                        operator: '=',
+//                        value: 'true'
+//                    }
+//                ]
+            }
+        };
+
+        if (config.storeConfig) {
+            delete config.storeConfig.autoLoad;
+
+            if (config.storeConfig.additionalFilters) {
+                defaultConfig.storeConfig.filters = defaultConfig.storeConfig.filters.concat(config.storeConfig.additionalFilters);
+            }
+        }
+
+        this.callParent([Ext.Object.merge(defaultConfig, config)]);
+    },
+
+    getSelectedType: function () {
+        return this.getTypeFromRef(this.getValue());
+    },
+
+    getTypeFromRef: function (typeRef) {
+        return this.getStore().findRecord('_ref', typeRef);
+    },
+
+    getTypeWithOrdinal: function(ordinal) {
+        return this.getStore().findRecord("Ordinal", ordinal);
+    },
+
+    getAllTypeNames: function () {
+        return _.map(this.getStore().getRecords(), function (type) { return type.get('TypePath'); });
+    },
+
+    getCurrentView: function () {
+        return {piTypePicker: this.getRecord().get('_refObjectUUID')};
+    }
+});
 Ext.define('CA.technicalservices.UserPickerDialog',{
     extend: 'Rally.ui.dialog.Dialog',
     alias: 'widget.tsuserpickerdialog',
@@ -965,7 +1045,7 @@ Ext.define("TSFieldEditorsByPI", {
         });
         
         type_container.add({ 
-            xtype: 'rallyportfolioitemtypecombobox',
+            xtype: 'tsmodeltypecombo',
             
             fieldLabel: 'Type:',
             labelWidth: 55,
@@ -974,6 +1054,31 @@ Ext.define("TSFieldEditorsByPI", {
                 change: function(cb) {
                     this.piType = cb.getRecord();
                     this._enableGoButton();
+                    
+                    if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
+                    
+                    type_container.add({ 
+                        xtype: 'rallyfieldcombobox',
+                        model: this.piType.get('TypePath'),
+                        fieldLabel: 'Field:',
+                        labelWidth: 55,
+                        _isNotHidden: function(field) {
+                            if ( field.hidden ) { return false; }
+                            if ( field.readOnly ) { return false; }
+                            var blacklist = ['Workspace','Attachments','Changesets'];
+                            
+                            if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
+                            
+                            return true;
+                        },
+                        listeners: {
+                            scope: this,
+                            change: function(cb) {
+                                this.field = cb.getRecord();
+                                this._enableGoButton();
+                            }
+                        }
+                    });
                 }
             }
         });
@@ -990,31 +1095,6 @@ Ext.define("TSFieldEditorsByPI", {
 //            }
 //        });
         
-        
-        type_container.add({ 
-            xtype: 'rallyfieldcombobox',
-            model: 'PortfolioItem',
-            fieldLabel: 'Field:',
-            labelWidth: 55,
-            _isNotHidden: function(field) {
-                if ( field.hidden ) { return false; }
-                if ( field.readOnly ) { return false; }
-                var blacklist = ['Workspace','Attachments','Changesets'];
-                
-                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
-                
-                return true;
-            },
-            listeners: {
-                scope: this,
-                change: function(cb) {
-                    this.field = cb.getRecord();
-                    this._enableGoButton();
-                }
-            }
-        });
-        
-        this.logger.log('timebox type:', this.timeboxType);
         if ( this.timeboxType == "Dates" ) {
             this._addDateSelectors(container); 
         }
@@ -1133,44 +1213,49 @@ Ext.define("TSFieldEditorsByPI", {
         this._getPIs(type).then({
             scope: this,
             success: function(pis) {
-                var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
-                var history_filters = Rally.data.wsapi.Filter.or(
-                    Ext.Array.map(pis, function(pi){
-                        var revision_history = pi.get('RevisionHistory');
-                        var oid = revision_history.ObjectID;
-                        // keep pi around so we can refer to it later
-                        pis_by_rev_history_oid[oid] = pi;
-                        
-                        return {property:'RevisionHistory.ObjectID',value:oid};
-                    })
-                );
-                                
-                var field_display_name = field.get('name');
-                var field_internal_name = field.get('value');
+                console.log('--', pis.length);
                 
-                var name_filters =  Rally.data.wsapi.Filter.or([
-                    {property:'Description',operator:'contains',value:field_display_name},
-                    {property:'Description',operator:'contains',value:field_internal_name}
-                ]);
+                var filters =  [{property:'ObjectID',value:-1}];
                 
-                var filters = name_filters.and(history_filters);
-                          
-                if ( end_date ) {
-                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                        property: 'CreationDate', 
-                        operator: '<=', 
-                        value: Rally.util.DateTime.toIsoString(end_date)
-                    }));
+                if ( pis.length > 0 ) {
+                    var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
+                    var history_filters = Rally.data.wsapi.Filter.or(
+                        Ext.Array.map(pis, function(pi){
+                            var revision_history = pi.get('RevisionHistory');
+                            var oid = revision_history.ObjectID;
+                            // keep pi around so we can refer to it later
+                            pis_by_rev_history_oid[oid] = pi;
+                            
+                            return {property:'RevisionHistory.ObjectID',value:oid};
+                        })
+                    );
+                                    
+                    var field_display_name = field.get('name');
+                    var field_internal_name = field.get('value');
+                    
+                    var name_filters =  Rally.data.wsapi.Filter.or([
+                        {property:'Description',operator:'contains',value:field_display_name},
+                        {property:'Description',operator:'contains',value:field_internal_name}
+                    ]);
+                                    
+                    var filters = name_filters.and(history_filters);
+                              
+                    if ( end_date ) {
+                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                            property: 'CreationDate', 
+                            operator: '<=', 
+                            value: Rally.util.DateTime.toIsoString(end_date)
+                        }));
+                    }
+                    
+                    if ( start_date ) {
+                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                            property: 'CreationDate', 
+                            operator: '>=', 
+                            value: Rally.util.DateTime.toIsoString(start_date)
+                        }));
+                    }
                 }
-                
-                if ( start_date ) {
-                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                        property: 'CreationDate', 
-                        operator: '>=', 
-                        value: Rally.util.DateTime.toIsoString(start_date)
-                    }));
-                }
-                
                 var config = {
                     model:'Revision',
                     filters: filters,
@@ -1235,18 +1320,19 @@ Ext.define("TSFieldEditorsByPI", {
     _isTypeWithRelease: function(type){
         console.log('type:', type);
         
-        
-        return type.get('Ordinal') == 0 ;
+        return type.get('Ordinal') < 1 ;
     },
     
     _loadWsapiRecords: function(config){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         var default_config = {
-            model: 'Defect',
+            model: 'Task',
             fetch: ['ObjectID']
         };
         this.logger.log("Starting load:",config.model);
+        this.logger.log("config: ", config);
+        
         Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
             callback : function(records, operation, successful) {
                 if (successful){

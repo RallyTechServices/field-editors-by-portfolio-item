@@ -39,7 +39,7 @@ Ext.define("TSFieldEditorsByPI", {
         });
         
         type_container.add({ 
-            xtype: 'rallyportfolioitemtypecombobox',
+            xtype: 'tsmodeltypecombo',
             
             fieldLabel: 'Type:',
             labelWidth: 55,
@@ -48,6 +48,31 @@ Ext.define("TSFieldEditorsByPI", {
                 change: function(cb) {
                     this.piType = cb.getRecord();
                     this._enableGoButton();
+                    
+                    if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
+                    
+                    type_container.add({ 
+                        xtype: 'rallyfieldcombobox',
+                        model: this.piType.get('TypePath'),
+                        fieldLabel: 'Field:',
+                        labelWidth: 55,
+                        _isNotHidden: function(field) {
+                            if ( field.hidden ) { return false; }
+                            if ( field.readOnly ) { return false; }
+                            var blacklist = ['Workspace','Attachments','Changesets'];
+                            
+                            if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
+                            
+                            return true;
+                        },
+                        listeners: {
+                            scope: this,
+                            change: function(cb) {
+                                this.field = cb.getRecord();
+                                this._enableGoButton();
+                            }
+                        }
+                    });
                 }
             }
         });
@@ -64,31 +89,6 @@ Ext.define("TSFieldEditorsByPI", {
 //            }
 //        });
         
-        
-        type_container.add({ 
-            xtype: 'rallyfieldcombobox',
-            model: 'PortfolioItem',
-            fieldLabel: 'Field:',
-            labelWidth: 55,
-            _isNotHidden: function(field) {
-                if ( field.hidden ) { return false; }
-                if ( field.readOnly ) { return false; }
-                var blacklist = ['Workspace','Attachments','Changesets'];
-                
-                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
-                
-                return true;
-            },
-            listeners: {
-                scope: this,
-                change: function(cb) {
-                    this.field = cb.getRecord();
-                    this._enableGoButton();
-                }
-            }
-        });
-        
-        this.logger.log('timebox type:', this.timeboxType);
         if ( this.timeboxType == "Dates" ) {
             this._addDateSelectors(container); 
         }
@@ -207,44 +207,49 @@ Ext.define("TSFieldEditorsByPI", {
         this._getPIs(type).then({
             scope: this,
             success: function(pis) {
-                var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
-                var history_filters = Rally.data.wsapi.Filter.or(
-                    Ext.Array.map(pis, function(pi){
-                        var revision_history = pi.get('RevisionHistory');
-                        var oid = revision_history.ObjectID;
-                        // keep pi around so we can refer to it later
-                        pis_by_rev_history_oid[oid] = pi;
-                        
-                        return {property:'RevisionHistory.ObjectID',value:oid};
-                    })
-                );
-                                
-                var field_display_name = field.get('name');
-                var field_internal_name = field.get('value');
+                console.log('--', pis.length);
                 
-                var name_filters =  Rally.data.wsapi.Filter.or([
-                    {property:'Description',operator:'contains',value:field_display_name},
-                    {property:'Description',operator:'contains',value:field_internal_name}
-                ]);
+                var filters =  [{property:'ObjectID',value:-1}];
                 
-                var filters = name_filters.and(history_filters);
-                          
-                if ( end_date ) {
-                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                        property: 'CreationDate', 
-                        operator: '<=', 
-                        value: Rally.util.DateTime.toIsoString(end_date)
-                    }));
+                if ( pis.length > 0 ) {
+                    var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
+                    var history_filters = Rally.data.wsapi.Filter.or(
+                        Ext.Array.map(pis, function(pi){
+                            var revision_history = pi.get('RevisionHistory');
+                            var oid = revision_history.ObjectID;
+                            // keep pi around so we can refer to it later
+                            pis_by_rev_history_oid[oid] = pi;
+                            
+                            return {property:'RevisionHistory.ObjectID',value:oid};
+                        })
+                    );
+                                    
+                    var field_display_name = field.get('name');
+                    var field_internal_name = field.get('value');
+                    
+                    var name_filters =  Rally.data.wsapi.Filter.or([
+                        {property:'Description',operator:'contains',value:field_display_name},
+                        {property:'Description',operator:'contains',value:field_internal_name}
+                    ]);
+                                    
+                    var filters = name_filters.and(history_filters);
+                              
+                    if ( end_date ) {
+                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                            property: 'CreationDate', 
+                            operator: '<=', 
+                            value: Rally.util.DateTime.toIsoString(end_date)
+                        }));
+                    }
+                    
+                    if ( start_date ) {
+                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                            property: 'CreationDate', 
+                            operator: '>=', 
+                            value: Rally.util.DateTime.toIsoString(start_date)
+                        }));
+                    }
                 }
-                
-                if ( start_date ) {
-                    filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                        property: 'CreationDate', 
-                        operator: '>=', 
-                        value: Rally.util.DateTime.toIsoString(start_date)
-                    }));
-                }
-                
                 var config = {
                     model:'Revision',
                     filters: filters,
@@ -309,18 +314,19 @@ Ext.define("TSFieldEditorsByPI", {
     _isTypeWithRelease: function(type){
         console.log('type:', type);
         
-        
-        return type.get('Ordinal') == 0 ;
+        return type.get('Ordinal') < 1 ;
     },
     
     _loadWsapiRecords: function(config){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         var default_config = {
-            model: 'Defect',
+            model: 'Task',
             fetch: ['ObjectID']
         };
         this.logger.log("Starting load:",config.model);
+        this.logger.log("config: ", config);
+        
         Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
             callback : function(records, operation, successful) {
                 if (successful){
