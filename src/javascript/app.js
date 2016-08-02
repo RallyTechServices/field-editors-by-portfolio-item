@@ -26,6 +26,8 @@ Ext.define("TSFieldEditorsByPI", {
     launch: function() {
         var me = this;
         this.timeboxType = this.getSetting('timeboxType');
+        this.useIndividualItem = this.getSetting('useIndividualItem');
+        
         this._addSelectors();
     },
     
@@ -38,62 +40,94 @@ Ext.define("TSFieldEditorsByPI", {
             layout: 'vbox'
         });
         
-        type_container.add({ 
-            xtype: 'tsmodeltypecombo',
-            
-            fieldLabel: 'Type:',
-            labelWidth: 55,
-            listeners: {
-                scope: this,
-                change: function(cb) {
-                    this.piType = cb.getRecord();
-                    this._enableGoButton();
-                    
-                    if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
-                    
-                    type_container.add({ 
-                        xtype: 'rallyfieldcombobox',
-                        model: this.piType.get('TypePath'),
-                        fieldLabel: 'Field:',
-                        labelWidth: 55,
-                        _isNotHidden: function(field) {
-                            if ( field.hidden ) { return false; }
-                            if ( field.readOnly ) { return false; }
-                            var blacklist = ['Workspace','Attachments','Changesets'];
-                            
-                            if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
-                            
-                            return true;
-                        },
-                        listeners: {
-                            scope: this,
-                            change: function(cb) {
-                                this.field = cb.getRecord();
-                                this._enableGoButton();
+
+        if ( this.useIndividualItem ) {
+            type_container.add({ 
+                xtype:'portfolioitempickerbutton',
+                layout: 'hbox',
+                listeners: {
+                    scope: this,
+                    itemschosen: function(picker,items) {
+                        this.logger.log('chosen:', items);
+                        this.PIs = items;
+                        this._enableGoButton();
+                        
+                        if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
+                        
+                        if ( this.PIs.length === 0 ) { return; }
+                        
+                        type_container.add({ 
+                            xtype: 'rallyfieldcombobox',
+                            model: this.PIs[0].get('_type'),
+                            fieldLabel: 'Field:',
+                            labelWidth: 55,
+                            _isNotHidden: function(field) {
+                                if ( field.hidden ) { return false; }
+                                if ( field.readOnly ) { return false; }
+                                var blacklist = ['Workspace','Attachments','Changesets'];
+                                
+                                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
+                                
+                                return true;
+                            },
+                            listeners: {
+                                scope: this,
+                                change: function(cb) {
+                                    this.field = cb.getRecord();
+                                    this._enableGoButton();
+                                }
                             }
-                        }
-                    });
+                        });
+                        
+                    }
                 }
-            }
-        });
-        
-//        container.add({ 
-//            xtype:'portfolioitempickerbutton',
-//            layout: 'hbox',
-//            listeners: {
-//                scope: this,
-//                itemschosen: function(picker,items) {
-//                    this.PIs = items;
-//                    this._enableGoButton();
-//                }
-//            }
-//        });
+            });
+        } else {
+            type_container.add({ 
+                xtype: 'tsmodeltypecombo',
+                
+                fieldLabel: 'Type:',
+                labelWidth: 55,
+                listeners: {
+                    scope: this,
+                    change: function(cb) {
+                        this.piType = cb.getRecord();
+                        this._enableGoButton();
+                        
+                        if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
+                        
+                        type_container.add({ 
+                            xtype: 'rallyfieldcombobox',
+                            model: this.piType.get('TypePath'),
+                            fieldLabel: 'Field:',
+                            labelWidth: 55,
+                            _isNotHidden: function(field) {
+                                if ( field.hidden ) { return false; }
+                                if ( field.readOnly ) { return false; }
+                                var blacklist = ['Workspace','Attachments','Changesets'];
+                                
+                                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
+                                
+                                return true;
+                            },
+                            listeners: {
+                                scope: this,
+                                change: function(cb) {
+                                    this.field = cb.getRecord();
+                                    this._enableGoButton();
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
         
         if ( this.timeboxType == "Dates" ) {
             this._addDateSelectors(container); 
         }
         
-        if ( this.timeboxType == "Release" ) {
+        if ( this.timeboxType == "Release" && this.useIndividualItem != true) {
             this._addReleaseSelector(container);
         }
         
@@ -177,7 +211,6 @@ Ext.define("TSFieldEditorsByPI", {
         if ( !button ) { return; }
         button.setDisabled(true);
         
-        
         if ( !this.piType && ( !this.PIs || this.PIs.length === 0 ) ) { return; }
         
         if ( Ext.isEmpty(this.field) ) { return; }
@@ -204,9 +237,11 @@ Ext.define("TSFieldEditorsByPI", {
 //            throw "Cannot proceed without revision history";
 //        }
         
-        this._getPIs(type).then({
+        this._getPIs(type, PIs).then({
             scope: this,
-            success: function(pis) {                
+            success: function(pis) {
+                this.logger.log("Found PIs:", pis.length);
+                
                 var filters =  [{property:'ObjectID',value:-1}];
                 
                 if ( pis.length > 0 ) {
@@ -291,18 +326,31 @@ Ext.define("TSFieldEditorsByPI", {
         
     },
     
-    _getPIs: function(type) {
-        var filters = [{property:'ObjectID',operator:'>',value:-1}];
+    _getPIs: function(type, pis) {
         
-        if ( this._isTypeWithRelease(type) && this.release ){
-            filters = [{property:'Release.Name',value:this.release.get('Name')}];
+        var filters = [{property:'ObjectID',operator:'>',value:-1}];
+        var model = null;
+        
+        if ( !Ext.isEmpty(pis) && pis.length > 0 ) { 
+            filters = Rally.data.wsapi.Filter.or(
+                Ext.Array.map(pis, function(pi) {
+                    model = pi.get('_type');
+                    return { property: "ObjectID", value: pi.get('ObjectID') };
+                })
+            );
+        } else {
+        
+            model = type.get('TypePath');
+            if ( this._isTypeWithRelease(type) && this.release ){
+                filters = [{property:'Release.Name',value:this.release.get('Name')}];
+            }
         }
 
         
         var config = {
             limit: Infinity,
             pageSize: 2000,
-            model: type.get('TypePath'),
+            model: model,
             filters: filters,
             fetch: ['FormattedID','RevisionHistory','Project','Name','ObjectID']
         };
@@ -387,7 +435,14 @@ Ext.define("TSFieldEditorsByPI", {
             labelAlign     : 'right',
             width          : 247,
             readyEvent     : 'ready'
+        },
+        { 
+            name: 'useIndividualItem',
+            xtype: 'rallycheckboxfield',
+            boxLabelAlign: 'after',
+            fieldLabel: '',
+            margin: '0 0 25 200',
+            boxLabel: 'Use Individual Item Picker<br/><span style="color:#999999;"><i>Tick to use allow user to pick a single item for review.  Otherwise, they have to chose a record type.</i></span>'
         }];
     }
-    
 });

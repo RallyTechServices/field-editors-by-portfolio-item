@@ -2,6 +2,8 @@
 
 Select a portfolio item, then a field, then a list of users who are allowed to change that field and Go.  The app will examine the revision history and determine if someone not authorized made a change to that field.
 
+UPDATED so that we can pick a record type instead of an individual item.  
+
 ## Development Notes
 Note that this scans revision history because lookback doesn't hold information about text fields.
 
