@@ -87,6 +87,8 @@
         },
 
         _createPortfolioItemStore: function () {
+            console.log('create pi store');
+            
             if ( Ext.isEmpty(this.value) || this.value.length === 0 ) {
                 return;
             }
@@ -101,7 +103,7 @@
             );
             
             Ext.create("Rally.data.wsapi.Store", {
-                model: Ext.identityFn("Portfolio Item"),
+                model: Ext.identityFn("PortfolioItem"),
                 filters: filters,
                 context: this.requestContext,
                 autoLoad: true,
@@ -230,7 +232,7 @@
 
         _getChooserConfig: function () {
             return {
-                artifactTypes: ['portfolioitem/initiative','portfolioitem/theme'],
+                artifactTypes: this.artifactTypes || ['portfolioitem/epic','portfolioitem/program'],
                 multiple: false,
                 height: 350,
                 title: 'Choose Portfolio Item to Add',

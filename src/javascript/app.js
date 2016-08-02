@@ -25,10 +25,24 @@ Ext.define("TSFieldEditorsByPI", {
 
     launch: function() {
         var me = this;
-        this.timeboxType = this.getSetting('timeboxType');
-        this.useIndividualItem = this.getSetting('useIndividualItem');
         
-        this._addSelectors();
+        this._getPortfolioItemTypes().then({
+            success: function(types) {
+                this.pi_paths = Ext.Array.map(types, function(type){
+                    return type.get('TypePath');
+                });
+               
+                console.log('typepaths', this.pi_paths);
+                
+                this.timeboxType = this.getSetting('timeboxType');
+                this.useIndividualItem = this.getSetting('useIndividualItem');
+                this._addSelectors();
+            },
+            failure: function(msg) {
+                Ext.Msg.alert('',msg);
+            },
+            scope: this
+        });
     },
     
     _addSelectors: function() {
@@ -45,6 +59,7 @@ Ext.define("TSFieldEditorsByPI", {
             type_container.add({ 
                 xtype:'portfolioitempickerbutton',
                 layout: 'hbox',
+                artifactTypes: this.pi_paths,
                 listeners: {
                     scope: this,
                     itemschosen: function(picker,items) {
@@ -359,6 +374,39 @@ Ext.define("TSFieldEditorsByPI", {
     
     _isTypeWithRelease: function(type){
         return type.get('Ordinal') < 1 ;
+    },
+    
+    _getPortfolioItemTypes: function() {
+        var deferred = Ext.create('Deft.Deferred');
+                
+        var store = Ext.create('Rally.data.wsapi.Store', {
+            fetch: ['Name','ElementName','TypePath'],
+            model: 'TypeDefinition',
+            filters: [
+                {
+                    property: 'Parent.Name',
+                    operator: '=',
+                    value: 'Portfolio Item'
+                },
+                {
+                    property: 'Creatable',
+                    operator: '=',
+                    value: 'true'
+                }
+            ],
+            autoLoad: true,
+            listeners: {
+                load: function(store, records, successful) {
+                    if (successful){
+                        deferred.resolve(records);
+                    } else {
+                        deferred.reject('Failed to load types');
+                    }
+                }
+            }
+        });
+                    
+        return deferred.promise;
     },
     
     _loadWsapiRecords: function(config){
