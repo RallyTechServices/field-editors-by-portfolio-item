@@ -1,8 +1,25 @@
 #Field Editors by PI
 
-Select a portfolio item, then a field, then a list of users who are allowed to change that field and Go.  The app will examine the revision history and determine if someone not authorized made a change to that field.
+Select a portfolio item, then a field, then a list of users who are allowed to change that field and Go.  
 
 UPDATED so that we can pick a record type instead of an individual item.  
+
+The app will examine the revision history and determine if someone not authorized made a change to that field.
+
+
+![ScreenShot](/images/field-editors-by-portfolio-item.png)
+
+## App Settings
+
+![ScreenShot](/images/field-editors-by-portfolio-item-settings.png)
+
+#### Type of Timebox
+Options are:
+ - Date (custom start to end dates)
+ - Release
+ 
+#### Use Individual Item Picker
+ Determines whether or not to allow for selection of a portfolio item or a record type.  The default is to select a record type.  
 
 ## Development Notes
 Note that this scans revision history because lookback doesn't hold information about text fields.
