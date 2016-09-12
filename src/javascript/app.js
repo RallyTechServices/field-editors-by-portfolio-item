@@ -51,7 +51,8 @@ Ext.define("TSFieldEditorsByPI", {
 
         var type_container = container.add({
             xtype:'container',
-            layout: 'vbox'
+            layout: 'vbox',
+            itemId: 'ctFieldPicker'
         });
         
 
@@ -62,78 +63,19 @@ Ext.define("TSFieldEditorsByPI", {
                 artifactTypes: this.pi_paths,
                 listeners: {
                     scope: this,
-                    itemschosen: function(picker,items) {
-                        this.logger.log('chosen:', items);
-                        this.PIs = items;
-                        this._enableGoButton();
-                        
-                        if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
-                        
-                        if ( this.PIs.length === 0 ) { return; }
-                        
-                        type_container.add({ 
-                            xtype: 'rallyfieldcombobox',
-                            model: this.PIs[0].get('_type'),
-                            fieldLabel: 'Field:',
-                            labelWidth: 55,
-                            _isNotHidden: function(field) {
-                                if ( field.hidden ) { return false; }
-                                if ( field.readOnly ) { return false; }
-                                var blacklist = ['Workspace','Attachments','Changesets'];
-                                
-                                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
-                                
-                                return true;
-                            },
-                            listeners: {
-                                scope: this,
-                                change: function(cb) {
-                                    this.field = cb.getRecord();
-                                    this._enableGoButton();
-                                }
-                            }
-                        });
-                        
-                    }
+                    itemschosen: this.updateFieldPickerForIndividualItem
                 }
             });
         } else {
             type_container.add({ 
                 xtype: 'tsmodeltypecombo',
-                
                 fieldLabel: 'Type:',
                 labelWidth: 55,
+                labelAlign: 'right',
+                width: 300,
                 listeners: {
                     scope: this,
-                    change: function(cb) {
-                        this.piType = cb.getRecord();
-                        this._enableGoButton();
-                        
-                        if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
-                        
-                        type_container.add({ 
-                            xtype: 'rallyfieldcombobox',
-                            model: this.piType.get('TypePath'),
-                            fieldLabel: 'Field:',
-                            labelWidth: 55,
-                            _isNotHidden: function(field) {
-                                if ( field.hidden ) { return false; }
-                                if ( field.readOnly ) { return false; }
-                                var blacklist = ['Workspace','Attachments','Changesets'];
-                                
-                                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
-                                
-                                return true;
-                            },
-                            listeners: {
-                                scope: this,
-                                change: function(cb) {
-                                    this.field = cb.getRecord();
-                                    this._enableGoButton();
-                                }
-                            }
-                        });
-                    }
+                    change: this.updateFieldPicker
                 }
             });
         }
@@ -159,6 +101,8 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
 
+
+
         container.add({
             xtype:'rallybutton',
             itemId:'go_button',
@@ -169,8 +113,128 @@ Ext.define("TSFieldEditorsByPI", {
                 click: this._updateData
             }
         });
+
+        container.add({
+            xtype: 'container',
+            flex: 1
+        });
+
+        container.add({
+            xtype: 'rallybutton',
+            iconCls: 'icon-export',
+            align: 'right',
+            cls: 'rly-small secondary',
+            itemId: 'exportButton',
+            disabled: true,
+            listeners: {
+                click: this.export,
+                scope: this
+            }
+        });
+
     },
-    
+    getTypeContainer: function(){
+        return this.down('#ctFieldPicker');
+    },
+    updateFieldPickerForIndividualItem: function(picker, items){
+        this.logger.log('updateFieldPickerForIndividualItem chosen:', items);
+        this.PIs = items;
+        if ( this.PIs.length === 0 ) { return; }
+        //this.addFieldPicker(this.PIs[0].get('_type'));
+        this.addMultiFieldPicker(this.PIs[0].get('_type'));
+    },
+    updateFieldPicker: function(cb){
+        this.piType = cb.getRecord();
+        //this.addFieldPicker(this.piType.get('TypePath'));
+        this.addMultiFieldPicker(this.piType.get('TypePath'));
+    },
+    addMultiFieldPicker: function(typePath){
+        var type_container = this.getTypeContainer();
+
+        this._enableGoButton();
+
+        if ( type_container.down('rallyfieldpicker') ) { type_container.down('rallyfieldpicker').destroy(); }
+
+        type_container.add({
+            xtype: 'rallyfieldpicker',
+            modelTypes: [typePath],
+            fieldLabel: 'Fields:',
+            labelWidth: 55,
+            alwaysExpanded: false,
+            margin: '10px 0 10px 0',
+            width: 300,
+            labelAlign: 'right',
+            fieldBlackList: ['Workspace','Attachments','Changesets'],
+
+            listeners: {
+                scope: this,
+                selectionchange: this._enableGoButton
+            }
+        });
+
+    },
+    getFields: function(){
+        var fields = this.down('rallyfieldpicker') && this.down('rallyfieldpicker').getValue() || [];
+        this.logger.log('getFields',fields);
+        return fields;
+    },
+    addFieldPicker: function(typePath){
+        var type_container = this.getTypeContainer();
+
+        this._enableGoButton();
+
+        if ( type_container.down('rallyfieldcombobox') ) { type_container.down('rallyfieldcombobox').destroy(); }
+
+        type_container.add({
+            xtype: 'rallyfieldcombobox',
+            model: typePath,
+            fieldLabel: 'Field:',
+            labelWidth: 55,
+            _isNotHidden: function(field) {
+                if ( field.hidden ) { return false; }
+                if ( field.readOnly ) { return false; }
+                var blacklist = ['Workspace','Attachments','Changesets'];
+
+                if ( Ext.Array.contains(blacklist,field.name) ) { return false; }
+
+                return true;
+            },
+            listeners: {
+                scope: this,
+                change: function(cb) {
+                    this.field = cb.getRecord();
+                    this._enableGoButton();
+                }
+            }
+        });
+    },
+    export: function(){
+        var records = this.down('rallygrid') && this.down('rallygrid').getStore() && this.down('rallygrid').getStore().getRange();
+        this.logger.log('export', records);
+        var csv = [],
+            fileName = Ext.String.format("editors-{0}.csv",Rally.util.DateTime.format(new Date(), 'Y-m-d-h-i-s')),
+            columns = this._getColumns();
+
+        var headers = Ext.Array.map(columns, function(c){
+            return c.text;
+        });
+        csv.push(headers.join(","));
+
+        Ext.Array.each(records, function(r){
+            var row = [];
+            Ext.Array.each(columns, function(c){
+                var val = r.get(c.dataIndex) || "";
+                if (val && c.renderer){
+                    val = c.renderer(val,{},r);
+                }
+                row.push(val);
+            });
+            row = _.map(row, function(v){ return Ext.String.format("\"{0}\"", v.toString().replace(/"/g, "\"\""));});
+            csv.push(row.join(","));
+        });
+        csv = csv.join("\r\n");
+        CArABU.technicalservices.FileUtility.saveCSVToFile(csv,fileName);
+    },
     _addDateSelectors: function(container) {
         var date_container = container.add({
             xtype:'container',
@@ -227,24 +291,38 @@ Ext.define("TSFieldEditorsByPI", {
         button.setDisabled(true);
         
         if ( !this.piType && ( !this.PIs || this.PIs.length === 0 ) ) { return; }
-        
-        if ( Ext.isEmpty(this.field) ) { return; }
+
+        var fields = this.getFields();
+        if ( Ext.isEmpty(fields) || fields.length === 0 ) { return; }
         
         this.logger.log('PIs', this.PIs, ' Type:', this.piType);
         
         button.setDisabled(false);
+    },
+
+    _enableExportButton: function(enable){
+        var button = this.down('#exportButton');
+        if (!button) {return;}
+        if (enable === true){
+            button.setDisabled(false);
+        } else {
+            button.setDisabled(true);
+        }
+
     },
       
     _updateData: function() {
         var me = this,
             PIs = this.PIs || [],
             type = this.piType || null,
-            field = this.field,
+            fields = this.getFields(),
+            //field = this.field,
             users = this.users || [],
             end_date = this.endDate,
             start_date = this.startDate,
             release = this.release;
-        
+
+
         this.setLoading('Loading Revisions');
         
 //        var revision_history = this.PIs[0].get('RevisionHistory');
@@ -271,17 +349,19 @@ Ext.define("TSFieldEditorsByPI", {
                             return {property:'RevisionHistory.ObjectID',value:oid};
                         })
                     );
-                                    
-                    var field_display_name = field.get('name');
-                    var field_internal_name = field.get('value');
-                    
-                    var name_filters =  Rally.data.wsapi.Filter.or([
-                        {property:'Description',operator:'contains',value:field_display_name},
-                        {property:'Description',operator:'contains',value:field_internal_name}
-                    ]);
-                                    
+
+                    var name_filters = [];
+                    Ext.Array.each(fields, function(f){
+                        var field_display_name = f.get('displayName');
+                        var field_internal_name = f.get('name');
+
+                        name_filters.push({property:'Description',operator:'contains',value:field_display_name});
+                        name_filters.push({property:'Description',operator:'contains',value:field_internal_name});
+                    });
+
+                    name_filters = Rally.data.wsapi.Filter.or(name_filters);
                     var filters = name_filters.and(history_filters);
-                              
+                    this.logger.log('_updateData Revision filters', filters.toString());
                     if ( end_date ) {
                         filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
                             property: 'CreationDate', 
@@ -434,7 +514,7 @@ Ext.define("TSFieldEditorsByPI", {
     
     _displayGrid: function(records){
         this.down('#display_box').removeAll();
-        
+
         var store = Ext.create('Rally.data.custom.Store',{ data: records });
         
         this.down('#display_box').add({
@@ -443,6 +523,8 @@ Ext.define("TSFieldEditorsByPI", {
             showRowActionsColumn: false,
             columnCfgs: this._getColumns()
         });
+
+        this._enableExportButton(records.length > 0);
     },
     
     _getColumns: function() {
