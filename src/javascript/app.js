@@ -1,4 +1,3 @@
-
 Ext.define("TSFieldEditorsByPI", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -12,30 +11,29 @@ Ext.define("TSFieldEditorsByPI", {
     PIs: [],
     field: null,
     users: [],
-    
+
     integrationHeaders : {
         name : "TSFieldEditorsByPI"
     },
     
     config: {
         defaultSettings: {
-            timeboxType: 'Dates'
+            timeboxType: 'Dates',
+            useIndividualItem: false
         }
     },
 
     launch: function() {
-        var me = this;
-        
         this._getPortfolioItemTypes().then({
             success: function(types) {
                 this.pi_paths = Ext.Array.map(types, function(type){
                     return type.get('TypePath');
                 });
-               
-                console.log('typepaths', this.pi_paths);
-                
-                this.timeboxType = this.getSetting('timeboxType');
-                this.useIndividualItem = this.getSetting('useIndividualItem');
+
+                this.logger.log('typepaths', this.pi_paths);
+
+                //this.timeboxType = this.getSetting('timeboxType');
+                //this.useIndividualItem = this.getSetting('useIndividualItem');
                 this._addSelectors();
             },
             failure: function(msg) {
@@ -44,7 +42,7 @@ Ext.define("TSFieldEditorsByPI", {
             scope: this
         });
     },
-    
+
     _addSelectors: function() {
         var container = this.down('#selector_box');
         container.removeAll();
@@ -54,10 +52,10 @@ Ext.define("TSFieldEditorsByPI", {
             layout: 'vbox',
             itemId: 'ctFieldPicker'
         });
-        
+
 
         if ( this.useIndividualItem ) {
-            type_container.add({ 
+            type_container.add({
                 xtype:'portfolioitempickerbutton',
                 layout: 'hbox',
                 artifactTypes: this.pi_paths,
@@ -67,7 +65,7 @@ Ext.define("TSFieldEditorsByPI", {
                 }
             });
         } else {
-            type_container.add({ 
+            type_container.add({
                 xtype: 'tsmodeltypecombo',
                 fieldLabel: 'Type:',
                 labelWidth: 55,
@@ -79,15 +77,15 @@ Ext.define("TSFieldEditorsByPI", {
                 }
             });
         }
-        
+
         if ( this.timeboxType == "Dates" ) {
-            this._addDateSelectors(container); 
+            this._addDateSelectors(container);
         }
-        
+
         if ( this.timeboxType == "Release" && this.useIndividualItem != true) {
             this._addReleaseSelector(container);
         }
-        
+
         container.add({
             xtype: 'tsmultiuserpicker',
             fieldLabel: 'Allowed Users:',
@@ -95,7 +93,7 @@ Ext.define("TSFieldEditorsByPI", {
                 change: function(picker, users) {
                     this.users = Ext.Array.map(users, function(user){ return user._ref; });
                     //this._updateData();
-                    
+
                 },
                 scope: this
             }
@@ -173,7 +171,7 @@ Ext.define("TSFieldEditorsByPI", {
         });
 
     },
-    getFields: function(){
+    getSelectedFields: function(){
         var fields = this.down('rallyfieldpicker') && this.down('rallyfieldpicker').getValue() || [];
         this.logger.log('getFields',fields);
         return fields;
@@ -240,7 +238,7 @@ Ext.define("TSFieldEditorsByPI", {
             xtype:'container',
             layout: 'vbox'
         });
-        
+
         date_container.add({
             xtype: 'rallydatefield',
             itemId:'startDateSelector',
@@ -253,7 +251,7 @@ Ext.define("TSFieldEditorsByPI", {
                 }
             }
         });
-        
+
         date_container.add({
             xtype: 'rallydatefield',
             itemId:'endDateSelector',
@@ -267,9 +265,9 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
     },
-    
+
     _addReleaseSelector: function(container) {
-        
+
         container.add({
             xtype: 'rallyreleasecombobox',
             itemId:'releaseSelector',
@@ -283,20 +281,20 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
     },
-    
-    
+
+
     _enableGoButton: function() {
         var button = this.down('#go_button');
         if ( !button ) { return; }
         button.setDisabled(true);
-        
+
         if ( !this.piType && ( !this.PIs || this.PIs.length === 0 ) ) { return; }
 
-        var fields = this.getFields();
+        var fields = this.getSelectedFields();
         if ( Ext.isEmpty(fields) || fields.length === 0 ) { return; }
-        
+
         this.logger.log('PIs', this.PIs, ' Type:', this.piType);
-        
+
         button.setDisabled(false);
     },
 
@@ -310,12 +308,12 @@ Ext.define("TSFieldEditorsByPI", {
         }
 
     },
-      
+
     _updateData: function() {
         var me = this,
             PIs = this.PIs || [],
             type = this.piType || null,
-            fields = this.getFields(),
+            fields = this.getSelectedFields(),
             //field = this.field,
             users = this.users || [],
             end_date = this.endDate,
@@ -324,19 +322,19 @@ Ext.define("TSFieldEditorsByPI", {
 
 
         this.setLoading('Loading Revisions');
-        
+
 //        var revision_history = this.PIs[0].get('RevisionHistory');
 //        if ( Ext.isEmpty(revision_history) ) {
 //            throw "Cannot proceed without revision history";
 //        }
-        
+
         this._getPIs(type, PIs).then({
             scope: this,
             success: function(pis) {
                 this.logger.log("Found PIs:", pis.length);
-                
+
                 var filters =  [{property:'ObjectID',value:-1}];
-                
+
                 if ( pis.length > 0 ) {
                     var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
                     var history_filters = Rally.data.wsapi.Filter.or(
@@ -345,7 +343,7 @@ Ext.define("TSFieldEditorsByPI", {
                             var oid = revision_history.ObjectID;
                             // keep pi around so we can refer to it later
                             pis_by_rev_history_oid[oid] = pi;
-                            
+
                             return {property:'RevisionHistory.ObjectID',value:oid};
                         })
                     );
@@ -364,16 +362,16 @@ Ext.define("TSFieldEditorsByPI", {
                     this.logger.log('_updateData Revision filters', filters.toString());
                     if ( end_date ) {
                         filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                            property: 'CreationDate', 
-                            operator: '<=', 
+                            property: 'CreationDate',
+                            operator: '<=',
                             value: Rally.util.DateTime.toIsoString(end_date)
                         }));
                     }
-                    
+
                     if ( start_date ) {
                         filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                            property: 'CreationDate', 
-                            operator: '>=', 
+                            property: 'CreationDate',
+                            operator: '>=',
                             value: Rally.util.DateTime.toIsoString(start_date)
                         }));
                     }
@@ -387,16 +385,16 @@ Ext.define("TSFieldEditorsByPI", {
                     enablePostGet: true,
                     sorters: [{property:'CreationDate',direction:'DESC'}]
                 };
-                
+
                 this._loadWsapiRecords(config).then({
                     scope: this,
                     success: function(revisions){
                         this.logger.log('revisions:', revisions);
-                        
+
                         var filtered_records = Ext.Array.filter(revisions, function(revision){
                             return !Ext.Array.contains(users, revision.get('User')._ref);
                         });
-                        
+
                         var data = Ext.Array.map(filtered_records, function(record){
                             var item = record.getData();
                             var rev_history_oid = item.RevisionHistory.ObjectID;
@@ -416,17 +414,17 @@ Ext.define("TSFieldEditorsByPI", {
             failure: function(msg) {
                 Ext.Msg.alert('Problem loading ' + type.get('ElementName'), msg);
             }
-           
+
         });
-        
+
     },
-    
+
     _getPIs: function(type, pis) {
-        
+
         var filters = [{property:'ObjectID',operator:'>',value:-1}];
         var model = null;
-        
-        if ( !Ext.isEmpty(pis) && pis.length > 0 ) { 
+
+        if ( !Ext.isEmpty(pis) && pis.length > 0 ) {
             filters = Rally.data.wsapi.Filter.or(
                 Ext.Array.map(pis, function(pi) {
                     model = pi.get('_type');
@@ -434,14 +432,14 @@ Ext.define("TSFieldEditorsByPI", {
                 })
             );
         } else {
-        
+
             model = type.get('TypePath');
             if ( this._isTypeWithRelease(type) && this.release ){
                 filters = [{property:'Release.Name',value:this.release.get('Name')}];
             }
         }
 
-        
+
         var config = {
             limit: Infinity,
             pageSize: 2000,
@@ -451,14 +449,14 @@ Ext.define("TSFieldEditorsByPI", {
         };
         return this._loadWsapiRecords(config);
     },
-    
+
     _isTypeWithRelease: function(type){
         return type.get('Ordinal') < 1 ;
     },
-    
+
     _getPortfolioItemTypes: function() {
         var deferred = Ext.create('Deft.Deferred');
-                
+
         var store = Ext.create('Rally.data.wsapi.Store', {
             fetch: ['Name','ElementName','TypePath'],
             model: 'TypeDefinition',
@@ -485,10 +483,10 @@ Ext.define("TSFieldEditorsByPI", {
                 }
             }
         });
-                    
+
         return deferred.promise;
     },
-    
+
     _loadWsapiRecords: function(config){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -498,7 +496,7 @@ Ext.define("TSFieldEditorsByPI", {
         };
         this.logger.log("Starting load:",config.model);
         this.logger.log("config: ", config);
-        
+
         Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
             callback : function(records, operation, successful) {
                 if (successful){
@@ -511,12 +509,12 @@ Ext.define("TSFieldEditorsByPI", {
         });
         return deferred.promise;
     },
-    
+
     _displayGrid: function(records){
         this.down('#display_box').removeAll();
 
         var store = Ext.create('Rally.data.custom.Store',{ data: records });
-        
+
         this.down('#display_box').add({
             xtype: 'rallygrid',
             store: store,
@@ -526,7 +524,7 @@ Ext.define("TSFieldEditorsByPI", {
 
         this._enableExportButton(records.length > 0);
     },
-    
+
     _getColumns: function() {
         return [
             { dataIndex: '__pi_oid', text: 'ID', renderer: function(value,meta,record){
@@ -543,7 +541,13 @@ Ext.define("TSFieldEditorsByPI", {
             { dataIndex: 'Description', text: 'Description', flex: 1}
         ];
     },
-    
+    _launchInfo: function() {
+        if ( this.about_dialog ) { this.about_dialog.destroy(); }
+        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
     getOptions: function() {
         return [
             {
@@ -553,22 +557,21 @@ Ext.define("TSFieldEditorsByPI", {
             }
         ];
     },
-    
     getSettingsFields: function() {
         return [{
-            name           : 'timeboxType',
             xtype          : 'rallycombobox',
-            id             : 'timeboxType',
+            name           : 'timeboxType',
+           // id             : 'timeboxType',
             store          : ['Dates', 'Release'],
             fieldLabel     : 'Type of Timebox',
             labelWidth     : 105,
             labelAlign     : 'right',
-            width          : 247,
-            readyEvent     : 'ready'
+            width          : 247
+            //readyEvent     : 'ready'
         },
-        { 
-            name: 'useIndividualItem',
+        {
             xtype: 'rallycheckboxfield',
+            name: 'useIndividualItem',
             boxLabelAlign: 'after',
             fieldLabel: '',
             margin: '0 0 25 200',
