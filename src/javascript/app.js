@@ -32,8 +32,8 @@ Ext.define("TSFieldEditorsByPI", {
 
                 this.logger.log('typepaths', this.pi_paths);
 
-                //this.timeboxType = this.getSetting('timeboxType');
-                //this.useIndividualItem = this.getSetting('useIndividualItem');
+                this.timeboxType = this.getSetting('timeboxType');
+                this.useIndividualItem = this.getSetting('useIndividualItem');
                 this._addSelectors();
             },
             failure: function(msg) {
@@ -320,13 +320,7 @@ Ext.define("TSFieldEditorsByPI", {
             start_date = this.startDate,
             release = this.release;
 
-
         this.setLoading('Loading Revisions');
-
-//        var revision_history = this.PIs[0].get('RevisionHistory');
-//        if ( Ext.isEmpty(revision_history) ) {
-//            throw "Cannot proceed without revision history";
-//        }
 
         this._getPIs(type, PIs).then({
             scope: this,

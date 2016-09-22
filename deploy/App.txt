@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Sep 20 2016 11:09:49 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Sep 22 2016 17:39:30 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Sep 20 2016 11:09:49 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Sep 22 2016 17:39:30 GMT-0600 (MDT)";
         var STORY    = "US353";
         var BUILDER  = "kcorkan";
-        var CHECKSUM = 52798966482;
+        var CHECKSUM = 52339777510;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1124,8 +1124,8 @@ Ext.define("TSFieldEditorsByPI", {
 
                 this.logger.log('typepaths', this.pi_paths);
 
-                //this.timeboxType = this.getSetting('timeboxType');
-                //this.useIndividualItem = this.getSetting('useIndividualItem');
+                this.timeboxType = this.getSetting('timeboxType');
+                this.useIndividualItem = this.getSetting('useIndividualItem');
                 this._addSelectors();
             },
             failure: function(msg) {
@@ -1412,13 +1412,7 @@ Ext.define("TSFieldEditorsByPI", {
             start_date = this.startDate,
             release = this.release;
 
-
         this.setLoading('Loading Revisions');
-
-//        var revision_history = this.PIs[0].get('RevisionHistory');
-//        if ( Ext.isEmpty(revision_history) ) {
-//            throw "Cannot proceed without revision history";
-//        }
 
         this._getPIs(type, PIs).then({
             scope: this,
