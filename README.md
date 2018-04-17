@@ -10,18 +10,29 @@ The app will examine the revision history and determine if someone not authorize
 
 ![ScreenShot](/images/field-editors-by-portfolio-item-settings.png)
 
+
 #### Type of Timebox
 Options are:
  - Date (custom start to end dates)
  - Release
+
+ #### Caveats
+ If a field name is changed, it is possible that the search will not find changes to it that 
+ happened before the change.
 
 #### Use Individual Item Picker
  Determines whether or not to allow for selection of a portfolio item or a record type.  The default is to select a record type.  
 
 ## Development Notes
 Note that this scans revision history because lookback doesn't hold information about text fields.
+The app first gathers the items that are appropriate then sends further calls to ask for rev
+histories for each item that have the associated field in the description.  
 
 This is an example of using parallel chunking -- splitting the query into smaller bits that can be run in parallel.  (When 2500 items are found and we query for all of their revision histories in a giant OR statement, we sometimes get "communications failure".)
+
+To further help performance, if the start date is chosen, the app will only find items that have a
+last update date greater than or equal to the start date.  Otherwise, it finds all items (or all
+items in the same release) AND then applies the rev history logic.
 
 ### First Load
 

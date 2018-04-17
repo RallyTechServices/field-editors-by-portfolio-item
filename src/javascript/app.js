@@ -311,6 +311,8 @@ Ext.define("TSFieldEditorsByPI", {
     },
 
     _updateData: function() {
+        this.down('#display_box').removeAll();
+
         var me = this,
             PIs = this.PIs || [],
             type = this.piType || null,
@@ -332,6 +334,7 @@ Ext.define("TSFieldEditorsByPI", {
 
                 if ( pis.length === 0 ) {
                     this.setLoading(false);
+                    this.down('#display_box').add({xtype:'container',html:'No data'});
                 } else {
                     var chunks = this._getRevisionChunks(pis,fields,start_date,end_date);
                     this.logger.log('Split promises:', chunks.length);
@@ -438,9 +441,10 @@ Ext.define("TSFieldEditorsByPI", {
     },
 
     _getPIs: function(type, pis) {
-
-        var filters = [{property:'ObjectID',operator:'>',value:-1}];
         var model = null;
+        var start_date = this.startDate;
+
+        var filters = Rally.data.wsapi.Filter.and([{property:'ObjectID',operator:'>',value:-1}]);
 
         if ( !Ext.isEmpty(pis) && pis.length > 0 ) {
             filters = Rally.data.wsapi.Filter.or(
@@ -450,12 +454,20 @@ Ext.define("TSFieldEditorsByPI", {
                 })
             );
         } else {
-
             model = type.get('TypePath');
             if ( this._isTypeWithRelease(type) && this.release ){
-                filters = [{property:'Release.Name',value:this.release.get('Name')}];
+                filters = Rally.data.wsapi.Filter.and([{property:'Release.Name',value:this.release.get('Name')}]);
             }
         }
+
+        if (start_date) {
+            filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                property: 'LastUpdateDate',
+                operator: '>=',
+                value: Rally.util.DateTime.toIsoString(start_date)
+            }));
+        }
+
 
         var config = {
             limit: Infinity,

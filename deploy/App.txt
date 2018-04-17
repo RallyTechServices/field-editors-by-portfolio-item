@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Apr 16 2018 20:22:10 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Apr 16 2018 20:45:21 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Apr 16 2018 20:22:10 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Apr 16 2018 20:45:21 GMT-0700 (PDT)";
         var STORY    = "US353";
         var BUILDER  = "marjo60";
-        var CHECKSUM = 58313479944;
+        var CHECKSUM = 59485975287;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1484,6 +1484,8 @@ Ext.define("TSFieldEditorsByPI", {
     },
 
     _updateData: function() {
+        this.down('#display_box').removeAll();
+
         var me = this,
             PIs = this.PIs || [],
             type = this.piType || null,
@@ -1505,6 +1507,7 @@ Ext.define("TSFieldEditorsByPI", {
 
                 if ( pis.length === 0 ) {
                     this.setLoading(false);
+                    this.down('#display_box').add({xtype:'container',html:'No data'});
                 } else {
                     var chunks = this._getRevisionChunks(pis,fields,start_date,end_date);
                     this.logger.log('Split promises:', chunks.length);
@@ -1611,9 +1614,10 @@ Ext.define("TSFieldEditorsByPI", {
     },
 
     _getPIs: function(type, pis) {
-
-        var filters = [{property:'ObjectID',operator:'>',value:-1}];
         var model = null;
+        var start_date = this.startDate;
+
+        var filters = Rally.data.wsapi.Filter.and([{property:'ObjectID',operator:'>',value:-1}]);
 
         if ( !Ext.isEmpty(pis) && pis.length > 0 ) {
             filters = Rally.data.wsapi.Filter.or(
@@ -1623,12 +1627,20 @@ Ext.define("TSFieldEditorsByPI", {
                 })
             );
         } else {
-
             model = type.get('TypePath');
             if ( this._isTypeWithRelease(type) && this.release ){
-                filters = [{property:'Release.Name',value:this.release.get('Name')}];
+                filters = Rally.data.wsapi.Filter.and([{property:'Release.Name',value:this.release.get('Name')}]);
             }
         }
+
+        if (start_date) {
+            filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                property: 'LastUpdateDate',
+                operator: '>=',
+                value: Rally.util.DateTime.toIsoString(start_date)
+            }));
+        }
+
 
         var config = {
             limit: Infinity,
