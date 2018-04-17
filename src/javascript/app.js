@@ -15,7 +15,7 @@ Ext.define("TSFieldEditorsByPI", {
     integrationHeaders : {
         name : "TSFieldEditorsByPI"
     },
-    
+
     config: {
         defaultSettings: {
             timeboxType: 'Dates',
@@ -380,7 +380,7 @@ Ext.define("TSFieldEditorsByPI", {
                     sorters: [{property:'CreationDate',direction:'DESC'}]
                 };
 
-                this._loadWsapiRecords(config).then({
+                TSUtilities.loadWsapiRecords(config).then({
                     scope: this,
                     success: function(revisions){
                         this.logger.log('revisions:', revisions);
@@ -433,7 +433,6 @@ Ext.define("TSFieldEditorsByPI", {
             }
         }
 
-
         var config = {
             limit: Infinity,
             pageSize: 2000,
@@ -441,7 +440,7 @@ Ext.define("TSFieldEditorsByPI", {
             filters: filters,
             fetch: ['FormattedID','RevisionHistory','Project','Name','ObjectID']
         };
-        return this._loadWsapiRecords(config);
+        return TSUtilities.loadWsapiRecords(config);
     },
 
     _isTypeWithRelease: function(type){
@@ -478,29 +477,6 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
 
-        return deferred.promise;
-    },
-
-    _loadWsapiRecords: function(config){
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-        var default_config = {
-            model: 'Task',
-            fetch: ['ObjectID']
-        };
-        this.logger.log("Starting load:",config.model);
-        this.logger.log("config: ", config);
-
-        Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
-            callback : function(records, operation, successful) {
-                if (successful){
-                    deferred.resolve(records);
-                } else {
-                    me.logger.log("Failed: ", operation);
-                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
-                }
-            }
-        });
         return deferred.promise;
     },
 

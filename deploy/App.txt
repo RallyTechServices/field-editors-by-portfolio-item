@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Apr 16 2018 19:27:06 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Apr 16 2018 19:39:01 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Apr 16 2018 19:27:06 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Apr 16 2018 19:39:01 GMT-0700 (PDT)";
         var STORY    = "US353";
         var BUILDER  = "marjo60";
-        var CHECKSUM = 52339777565;
+        var CHECKSUM = 53527658230;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -208,6 +208,49 @@ Ext.define('Rally.technicalservices.Logger',{
         window.console && console.log.apply(console,output_args);
     }
 
+});
+
+Ext.define('TSUtilities', {
+
+    singleton: true,
+
+    loadWsapiRecords: function(config){
+        var deferred = Ext.create('Deft.Deferred');
+        var default_config = {
+            model: 'Defect',
+            fetch: ['ObjectID']
+        };
+        Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
+            callback : function(records, operation, successful) {
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    console.error("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+
+    loadAStoreWithAPromise: function(model_name, model_fields){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.Store', {
+            model: model_name,
+            fetch: model_fields
+        }).load({
+            callback : function(records, operation, successful) {
+                if (successful){
+                    deferred.resolve(this);
+                } else {
+                    console.error("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    }
 });
 
 Ext.define('CArABU.technicalservices.FileUtility', {
@@ -1107,7 +1150,7 @@ Ext.define("TSFieldEditorsByPI", {
     integrationHeaders : {
         name : "TSFieldEditorsByPI"
     },
-    
+
     config: {
         defaultSettings: {
             timeboxType: 'Dates',
@@ -1472,7 +1515,7 @@ Ext.define("TSFieldEditorsByPI", {
                     sorters: [{property:'CreationDate',direction:'DESC'}]
                 };
 
-                this._loadWsapiRecords(config).then({
+                TSUtilities.loadWsapiRecords(config).then({
                     scope: this,
                     success: function(revisions){
                         this.logger.log('revisions:', revisions);
@@ -1525,7 +1568,6 @@ Ext.define("TSFieldEditorsByPI", {
             }
         }
 
-
         var config = {
             limit: Infinity,
             pageSize: 2000,
@@ -1533,7 +1575,7 @@ Ext.define("TSFieldEditorsByPI", {
             filters: filters,
             fetch: ['FormattedID','RevisionHistory','Project','Name','ObjectID']
         };
-        return this._loadWsapiRecords(config);
+        return TSUtilities.loadWsapiRecords(config);
     },
 
     _isTypeWithRelease: function(type){
@@ -1570,29 +1612,6 @@ Ext.define("TSFieldEditorsByPI", {
             }
         });
 
-        return deferred.promise;
-    },
-
-    _loadWsapiRecords: function(config){
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-        var default_config = {
-            model: 'Task',
-            fetch: ['ObjectID']
-        };
-        this.logger.log("Starting load:",config.model);
-        this.logger.log("config: ", config);
-
-        Ext.create('Rally.data.wsapi.Store', Ext.Object.merge(default_config,config)).load({
-            callback : function(records, operation, successful) {
-                if (successful){
-                    deferred.resolve(records);
-                } else {
-                    me.logger.log("Failed: ", operation);
-                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
-                }
-            }
-        });
         return deferred.promise;
     },
 
