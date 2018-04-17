@@ -1,11 +1,10 @@
-#Field Editors by PI
+# Field Editors by PI
 
 Select a portfolio item, then a field, then a list of users who are allowed to change that field and Go.  
 
 UPDATED so that we can pick a record type instead of an individual item.  
 
 The app will examine the revision history and determine if someone not authorized made a change to that field.
-
 
 ![ScreenShot](/images/field-editors-by-portfolio-item.png)
 
