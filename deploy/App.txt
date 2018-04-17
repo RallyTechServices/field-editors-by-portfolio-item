@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Sep 22 2016 17:39:30 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Apr 16 2018 19:27:06 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Sep 22 2016 17:39:30 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Apr 16 2018 19:27:06 GMT-0700 (PDT)";
         var STORY    = "US353";
-        var BUILDER  = "kcorkan";
-        var CHECKSUM = 52339777510;
+        var BUILDER  = "marjo60";
+        var CHECKSUM = 52339777565;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
