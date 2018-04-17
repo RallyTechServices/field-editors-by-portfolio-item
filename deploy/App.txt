@@ -3,13 +3,13 @@
 <head>
     <title>Field Editors by PI</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Apr 16 2018 19:39:01 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Apr 16 2018 20:22:10 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Apr 16 2018 19:39:01 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Apr 16 2018 20:22:10 GMT-0700 (PDT)";
         var STORY    = "US353";
         var BUILDER  = "marjo60";
-        var CHECKSUM = 53527658230;
+        var CHECKSUM = 58313479944;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -250,6 +250,44 @@ Ext.define('TSUtilities', {
             }
         });
         return deferred.promise;
+    },
+
+// will execute an array of functions, with
+// maxParallelCalls of them run at in parallelFns
+// collects the results and returns them as an
+// array of arrays.  (Length of outer array = fns.length)
+//
+    throttle: function (fns, maxParallelCalls, scope) {
+
+        if (maxParallelCalls <= 0 || fns.length < maxParallelCalls){
+            return Deft.promise.Chain.parallel(fns, scope);
+        }
+
+
+        var parallelFns = [],
+            fnChunks = [],
+            idx = -1;
+
+        for (var i = 0; i < fns.length; i++) {
+            if (i % maxParallelCalls === 0) {
+                idx++;
+                fnChunks[idx] = [];
+            }
+            fnChunks[idx].push(fns[i]);
+        }
+
+        _.each(fnChunks, function (chunk) {
+            parallelFns.push(function () {
+                return Deft.promise.Chain.parallel(chunk, scope);
+            });
+        });
+
+        return Deft.Promise.reduce(parallelFns, function(groupResults, fnGroup) {
+            return Deft.Promise.when(fnGroup.call(scope)).then(function(results) {
+                groupResults = groupResults.concat(results || []);
+                return groupResults;
+            });
+        }, []);
     }
 });
 
@@ -1146,6 +1184,7 @@ Ext.define("TSFieldEditorsByPI", {
     PIs: [],
     field: null,
     users: [],
+    pis_by_rev_history_oid: {}, // key is OID of RevisionHistory
 
     integrationHeaders : {
         name : "TSFieldEditorsByPI"
@@ -1460,92 +1499,115 @@ Ext.define("TSFieldEditorsByPI", {
         this._getPIs(type, PIs).then({
             scope: this,
             success: function(pis) {
-                this.logger.log("Found PIs:", pis.length);
+                this.logger.log("Found items:", pis.length);
 
                 var filters =  [{property:'ObjectID',value:-1}];
 
-                if ( pis.length > 0 ) {
-                    var pis_by_rev_history_oid = {}; // key is OID of RevisionHistory
-                    var history_filters = Rally.data.wsapi.Filter.or(
-                        Ext.Array.map(pis, function(pi){
-                            var revision_history = pi.get('RevisionHistory');
-                            var oid = revision_history.ObjectID;
-                            // keep pi around so we can refer to it later
-                            pis_by_rev_history_oid[oid] = pi;
+                if ( pis.length === 0 ) {
+                    this.setLoading(false);
+                } else {
+                    var chunks = this._getRevisionChunks(pis,fields,start_date,end_date);
+                    this.logger.log('Split promises:', chunks.length);
 
-                            return {property:'RevisionHistory.ObjectID',value:oid};
-                        })
-                    );
+                    TSUtilities.throttle(chunks,6,this).then({
+                        scope: this,
+                        success: function(revisions){
+                            revisions = Ext.Array.flatten(revisions);
+                            this.logger.log('revisions:', revisions);
 
-                    var name_filters = [];
-                    Ext.Array.each(fields, function(f){
-                        var field_display_name = f.get('displayName');
-                        var field_internal_name = f.get('name');
+                            var filtered_records = Ext.Array.filter(revisions, function(revision){
+                                return !Ext.Array.contains(users, revision.get('User')._ref);
+                            });
 
-                        name_filters.push({property:'Description',operator:'contains',value:field_display_name});
-                        name_filters.push({property:'Description',operator:'contains',value:field_internal_name});
-                    });
-
-                    name_filters = Rally.data.wsapi.Filter.or(name_filters);
-                    var filters = name_filters.and(history_filters);
-                    this.logger.log('_updateData Revision filters', filters.toString());
-                    if ( end_date ) {
-                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                            property: 'CreationDate',
-                            operator: '<=',
-                            value: Rally.util.DateTime.toIsoString(end_date)
-                        }));
-                    }
-
-                    if ( start_date ) {
-                        filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
-                            property: 'CreationDate',
-                            operator: '>=',
-                            value: Rally.util.DateTime.toIsoString(start_date)
-                        }));
-                    }
+                            var data = Ext.Array.map(filtered_records, function(record){
+                                var item = record.getData();
+                                var rev_history_oid = item.RevisionHistory.ObjectID;
+                                item.__pi = me.pis_by_rev_history_oid[rev_history_oid];
+                                item.__pi_oid = item.__pi.get('ObjectID');
+                                item.__pi_fid = item.__pi.get('FormattedID');
+                                item.__pi_name = item.__pi.get('Name');
+                                return item;
+                            });
+                            me._displayGrid(data);
+                        },
+                        failure: function(msg) {
+                            Ext.Msg.alert('Problem Loading Revisions', msg);
+                        }
+                    }).always(function() { me.setLoading(false); });
                 }
-                var config = {
-                    model:'Revision',
-                    filters: filters,
-                    fetch: ['ObjectID','RevisionHistory','CreationDate','User','RevisionNumber','Description'],
-                    limit: Infinity,
-                    pageSize: 2000,
-                    enablePostGet: true,
-                    sorters: [{property:'CreationDate',direction:'DESC'}]
-                };
-
-                TSUtilities.loadWsapiRecords(config).then({
-                    scope: this,
-                    success: function(revisions){
-                        this.logger.log('revisions:', revisions);
-
-                        var filtered_records = Ext.Array.filter(revisions, function(revision){
-                            return !Ext.Array.contains(users, revision.get('User')._ref);
-                        });
-
-                        var data = Ext.Array.map(filtered_records, function(record){
-                            var item = record.getData();
-                            var rev_history_oid = item.RevisionHistory.ObjectID;
-                            item.__pi = pis_by_rev_history_oid[rev_history_oid];
-                            item.__pi_oid = item.__pi.get('ObjectID');
-                            item.__pi_fid = item.__pi.get('FormattedID');
-                            item.__pi_name = item.__pi.get('Name');
-                            return item;
-                        });
-                        me._displayGrid(data);
-                    },
-                    failure: function(msg) {
-                        Ext.Msg.alert('Problem Loading Revisions', msg);
-                    }
-                }).always(function() { me.setLoading(false); });
             },
             failure: function(msg) {
                 Ext.Msg.alert('Problem loading ' + type.get('ElementName'), msg);
             }
 
         });
+    },
 
+    // returns an array of functions so that we aren't
+    // asking for 2500 revision histories at once
+    _getRevisionChunks: function(items,fields,start_date,end_date) {
+        var me = this;
+        var name_filters = [];
+        Ext.Array.each(fields, function(f){
+            var field_display_name = f.get('displayName');
+            var field_internal_name = f.get('name');
+
+            name_filters.push({property:'Description',operator:'contains',value:field_display_name});
+            name_filters.push({property:'Description',operator:'contains',value:field_internal_name});
+        });
+
+        name_filters = Rally.data.wsapi.Filter.or(name_filters);
+
+        var total = items.length;
+        var page_size = 500;
+        var page_count = Math.ceil(total/page_size);
+        var promises = [];
+
+        Ext.Array.each(_.range(0,page_count),function(page_index){
+            var start = page_index*page_size;
+            var end = start + page_size;
+            me.logger.log(start,end,total);
+            var items_subset = Ext.Array.slice(items,start,end);
+            var history_filters = Rally.data.wsapi.Filter.or(
+                Ext.Array.map(items_subset, function(item){
+                    var revision_history = item.get('RevisionHistory');
+                    var oid = revision_history.ObjectID;
+                    // keep pi around so we can refer to it later
+                    me.pis_by_rev_history_oid[oid] = item;
+                    return {property:'RevisionHistory.ObjectID',value:oid};
+                })
+            );
+            var filters = name_filters.and(history_filters);
+
+            if ( end_date ) {
+                filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                    property: 'CreationDate',
+                    operator: '<=',
+                    value: Rally.util.DateTime.toIsoString(end_date)
+                }));
+            }
+
+            if ( start_date ) {
+                filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                    property: 'CreationDate',
+                    operator: '>=',
+                    value: Rally.util.DateTime.toIsoString(start_date)
+                }));
+            }
+
+            var config = {
+                model:'Revision',
+                filters: filters,
+                fetch: ['ObjectID','RevisionHistory','CreationDate','User','RevisionNumber','Description'],
+                limit: Infinity,
+                pageSize: 2000,
+                enablePostGet: true,
+                sorters: [{property:'CreationDate',direction:'DESC'}]
+            };
+            promises.push(function(){return TSUtilities.loadWsapiRecords(config);});
+        });
+
+        return promises;
     },
 
     _getPIs: function(type, pis) {

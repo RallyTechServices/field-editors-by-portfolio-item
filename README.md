@@ -21,6 +21,8 @@ Options are:
 ## Development Notes
 Note that this scans revision history because lookback doesn't hold information about text fields.
 
+This is an example of using parallel chunking -- splitting the query into smaller bits that can be run in parallel.  (When 2500 items are found and we query for all of their revision histories in a giant OR statement, we sometimes get "communications failure".)
+
 ### First Load
 
 If you've just downloaded this from github and you want to do development,
